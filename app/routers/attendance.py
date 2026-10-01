@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.database import get_db, get_fs
 from app.core.deps import get_current_user, require_admin
 from app.schemas import AttendanceMarkIn
-from app.services.calendar import month_summary
+from app.services.calendar import is_working_day, month_summary
 from app.services.company import get_company_settings
 from app.services.geo import build_location
 from app.services.users import employee_brief, user_map
@@ -202,7 +202,7 @@ async def my_today(user: dict = Depends(get_current_user)):
             "enforce_geofence": company["enforce_geofence"],
             "office_radius_m": company["office_radius_m"],
             "has_office_location": company["office_lat"] is not None,
-            "is_working_day": local_today().weekday() in company["working_days"],
+            "is_working_day": is_working_day(local_today(), company, user),
         },
     }
 

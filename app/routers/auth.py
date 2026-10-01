@@ -71,6 +71,9 @@ async def me(user: dict = Depends(get_current_user)):
 
 @router.put("/me")
 async def update_me(data: ProfileUpdateIn, user: dict = Depends(get_current_user)):
+    # Employees' contact details are managed by an administrator (Employees page) and are read-only to them.
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Contact details can only be changed by an administrator")
     updates = data.model_dump(exclude_unset=True)
     if updates:
         updates["updated_at"] = now_utc()

@@ -62,6 +62,9 @@ class UserBase(BaseModel):
     emergency_contact: Optional[str] = Field(None, max_length=100)
     shift_start: Optional[str] = None
     shift_end: Optional[str] = None
+    # Weekly off day (0 = Monday ... 6 = Sunday) and one extra off date; both are days off for this employee
+    week_off_day: Optional[int] = Field(None, ge=0, le=6)
+    week_off_date: Optional[str] = None
     bank_account: Optional[str] = Field(None, max_length=40)
     ifsc: Optional[str] = Field(None, max_length=20)
     pan: Optional[str] = Field(None, max_length=20)
@@ -72,10 +75,15 @@ class UserBase(BaseModel):
     def blanks(cls, v):
         return _blank_to_none(v)
 
-    @field_validator("date_of_joining", "date_of_birth", mode="before")
+    @field_validator("date_of_joining", "date_of_birth", "week_off_date", mode="before")
     @classmethod
     def dates(cls, v):
         return _check_date(_blank_to_none(v))
+
+    @field_validator("week_off_day", mode="before")
+    @classmethod
+    def week_off(cls, v):
+        return _blank_to_none(v)
 
     @field_validator("shift_start", "shift_end", mode="before")
     @classmethod
@@ -215,7 +223,7 @@ class SettingsIn(BaseModel):
     grace_minutes: int = Field(15, ge=0, le=180)
     half_day_hours: float = Field(4, ge=0, le=24)
     full_day_hours: float = Field(8, ge=0, le=24)
-    working_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4])
+    working_days: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4, 5, 6])
     office_lat: Optional[float] = Field(None, ge=-90, le=90)
     office_lng: Optional[float] = Field(None, ge=-180, le=180)
     office_radius_m: int = Field(200, ge=10, le=100000)

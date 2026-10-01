@@ -47,9 +47,9 @@ async def apply_leave(data: LeaveIn, user: dict = Depends(get_current_user)):
     db = get_db()
     company = await get_company_settings()
     start, end = date.fromisoformat(data.start_date), date.fromisoformat(data.end_date)
-    days = await count_leave_days(start, end, data.half_day, company)
+    days = await count_leave_days(start, end, data.half_day, company, user)
     if days == 0:
-        raise HTTPException(400, "The selected dates are weekends or holidays")
+        raise HTTPException(400, "The selected dates are your week off, so no leave is needed")
 
     overlap = await db.leaves.find_one({
         "user_id": user["_id"], "status": {"$in": ["pending", "approved"]},

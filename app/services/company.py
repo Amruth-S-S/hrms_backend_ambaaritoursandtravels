@@ -13,7 +13,7 @@ DEFAULT_SETTINGS = {
     "grace_minutes": 15,
     "half_day_hours": 4,
     "full_day_hours": 8,
-    "working_days": [0, 1, 2, 3, 4],  # Mon-Fri (0 = Monday)
+    "working_days": [0, 1, 2, 3, 4, 5, 6],  # every day (0 = Monday); each employee has their own week off
     "office_lat": None,
     "office_lng": None,
     "office_radius_m": 200,

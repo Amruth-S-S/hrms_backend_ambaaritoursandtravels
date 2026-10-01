@@ -13,30 +13,37 @@ async def holiday_dates(start: date, end: date) -> dict[str, str]:
     return {h["date"]: h["name"] async for h in cur}
 
 
-def is_working_day(d: date, company: dict, holidays: dict) -> bool:
-    return d.weekday() in company["working_days"] and d.isoformat() not in holidays
+def is_week_off(d: date, user: dict | None) -> bool:
+    """The employee's own weekly off day, or their one extra off date."""
+    if not user:
+        return False
+    return d.weekday() == user.get("week_off_day") or d.isoformat() == user.get("week_off_date")
 
 
-async def count_leave_days(start: date, end: date, half_day: bool, company: dict) -> float:
-    holidays = await holiday_dates(start, end)
-    days = sum(1 for d in daterange(start, end) if is_working_day(d, company, holidays))
+def is_working_day(d: date, company: dict, user: dict | None = None) -> bool:
+    """Holidays are informational only: the company works on them. Days off come from the
+    company's working days and the employee's own week off."""
+    return d.weekday() in company["working_days"] and not is_week_off(d, user)
+
+
+async def count_leave_days(start: date, end: date, half_day: bool, company: dict, user: dict | None = None) -> float:
+    days = sum(1 for d in daterange(start, end) if is_working_day(d, company, user))
     if half_day and days:
         return 0.5
     return float(days)
 
 
-async def approved_leave_map(user_id: ObjectId, start: date, end: date, company: dict) -> dict:
-    """date string -> {'type': leave_type, 'half': bool} for approved leave on working days."""
-    holidays = await holiday_dates(start, end)
+async def approved_leave_map(user: dict, start: date, end: date, company: dict) -> dict:
+    """date string -> {'type': leave_type, 'half': bool} for approved leave on the employee's working days."""
     cur = get_db().leaves.find({
-        "user_id": user_id, "status": "approved",
+        "user_id": user["_id"], "status": "approved",
         "start_date": {"$lte": end.isoformat()}, "end_date": {"$gte": start.isoformat()},
     })
     out = {}
     async for lv in cur:
         ls, le = date.fromisoformat(lv["start_date"]), date.fromisoformat(lv["end_date"])
         for d in daterange(max(ls, start), min(le, end)):
-            if is_working_day(d, company, holidays):
+            if is_working_day(d, company, user):
                 out[d.isoformat()] = {"type": lv["leave_type"], "half": bool(lv.get("half_day"))}
     return out
 
@@ -52,7 +59,7 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
         "user_id": user_id, "date": {"$gte": start.isoformat(), "$lte": end.isoformat()},
     }).to_list(None)
     by_date = {r["date"]: r for r in records}
-    leaves = await approved_leave_map(user_id, start, end, company)
+    leaves = await approved_leave_map(user, start, end, company)
 
     s = {"month": month, "working_days": 0, "present": 0, "half_day": 0, "absent": 0,
          "late": 0, "late_minutes": 0, "late_blocks": 0, "paid_leave": 0.0, "unpaid_leave": 0.0, "holidays": len(holidays),
@@ -70,7 +77,7 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
                 s["late_minutes"] += rec.get("late_minutes", 0) or 0
                 if not cut_from or ds >= cut_from:
                     s["late_blocks"] += late_blocks(rec.get("late_minutes", 0))
-        if not is_working_day(d, company, holidays) or (joined and ds < joined):
+        if not is_working_day(d, company, user) or (joined and ds < joined):
             continue
         s["working_days"] += 1
         status = rec.get("status") if rec else None
