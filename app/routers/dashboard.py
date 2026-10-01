@@ -49,6 +49,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
     upcoming = await db.holidays.find({"date": {"$gte": today}}).sort("date", 1).to_list(3)
     return {
         "salaries": await _salary_rows(),
+        "late_cut_start": (await get_company_settings()).get("late_cut_start"),
         "date": today,
         "employees": {"active": total, "inactive": inactive},
         "today": {"checked_in": checked_in, "checked_out": checked_out, "late": late,

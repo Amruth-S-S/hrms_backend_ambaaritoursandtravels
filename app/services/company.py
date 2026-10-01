@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "enforce_geofence": False,
     "require_selfie": True,
     "leave_quota": {"casual": 12, "sick": 8, "earned": 15},
+    "late_cut_start": None,  # "YYYY-MM-DD": only late arrivals from this date are cut from salary
 }
 
 

@@ -58,6 +58,7 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
          "late": 0, "late_minutes": 0, "late_blocks": 0, "paid_leave": 0.0, "unpaid_leave": 0.0, "holidays": len(holidays),
          "work_minutes": 0, "overtime_minutes": 0}
 
+    cut_from = company.get("late_cut_start")
     for d in daterange(start, end):
         ds = d.isoformat()
         rec = by_date.get(ds)
@@ -67,7 +68,8 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
             if rec.get("is_late"):
                 s["late"] += 1
                 s["late_minutes"] += rec.get("late_minutes", 0) or 0
-                s["late_blocks"] += late_blocks(rec.get("late_minutes", 0))
+                if not cut_from or ds >= cut_from:
+                    s["late_blocks"] += late_blocks(rec.get("late_minutes", 0))
         if not is_working_day(d, company, holidays) or (joined and ds < joined):
             continue
         s["working_days"] += 1

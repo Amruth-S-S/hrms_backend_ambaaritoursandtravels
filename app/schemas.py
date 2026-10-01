@@ -222,6 +222,18 @@ class SettingsIn(BaseModel):
     enforce_geofence: bool = False
     require_selfie: bool = True
     leave_quota: LeaveQuota = Field(default_factory=LeaveQuota)
+    # Late arrivals on or after this date (YYYY-MM-DD) are cut from salary; None = every late arrival counts
+    late_cut_start: Optional[str] = None
+
+    @field_validator("late_cut_start", mode="before")
+    @classmethod
+    def cut_start(cls, v):
+        if v in (None, ""):
+            return None
+        try:
+            return date.fromisoformat(str(v)).isoformat()
+        except ValueError:
+            raise ValueError("Late cut start must be a date (YYYY-MM-DD)")
 
     @field_validator("office_start", "office_end")
     @classmethod
