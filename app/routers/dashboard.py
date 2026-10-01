@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends
@@ -7,6 +8,7 @@ from app.core.deps import get_current_user, require_admin
 from app.routers.leaves import leave_balance
 from app.services.calendar import month_summary
 from app.services.company import get_company_settings
+from app.services.late_fine import salary_summary
 from app.services.users import employee_brief, user_map
 from app.utils import local_now, local_today, serialize, today_str
 
@@ -46,6 +48,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
 
     upcoming = await db.holidays.find({"date": {"$gte": today}}).sort("date", 1).to_list(3)
     return {
+        "salaries": await _salary_rows(),
         "date": today,
         "employees": {"active": total, "inactive": inactive},
         "today": {"checked_in": checked_in, "checked_out": checked_out, "late": late,
@@ -59,6 +62,21 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
     }
 
 
+async def _salary_rows() -> list[dict]:
+    """This month's salary, late cut and amount to pay for every active employee."""
+    company = await get_company_settings()
+    month = local_now().strftime("%Y-%m")
+    users = await get_db().users.find({"role": "employee", "status": "active"}).sort("name", 1).to_list(None)
+    summaries = await asyncio.gather(*(month_summary(u, month, company) for u in users))
+    rows = []
+    for u, summary in zip(users, summaries):
+        row = {"id": str(u["_id"]), **employee_brief(u)}
+        row.update(salary_summary(u.get("salary"), summary))
+        row["late_days"] = summary["late"]
+        rows.append(row)
+    return rows
+
+
 @router.get("/employee")
 async def employee_dashboard(user: dict = Depends(get_current_user)):
     db = get_db()
@@ -68,8 +86,10 @@ async def employee_dashboard(user: dict = Depends(get_current_user)):
     upcoming = await db.holidays.find({"date": {"$gte": today}}).sort("date", 1).to_list(4)
     news = await db.announcements.find().sort("created_at", -1).to_list(5)
     pending = await db.leaves.count_documents({"user_id": user["_id"], "status": "pending"})
+    summary = await month_summary(user, month, company)
     return {
-        "month_summary": await month_summary(user, month, company),
+        "month_summary": summary,
+        "salary": salary_summary(user.get("salary"), summary),
         "leave_balance": await leave_balance(user, company),
         "pending_leaves": pending,
         "upcoming_holidays": serialize(upcoming),

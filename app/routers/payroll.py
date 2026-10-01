@@ -5,6 +5,7 @@ from app.core.deps import get_current_user, require_admin
 from app.schemas import PayrollGenerateIn, PayrollUpdateIn
 from app.services.calendar import month_summary
 from app.services.company import get_company_settings
+from app.services.late_fine import fine_per_block, late_deduction
 from app.services.users import department_map, employee_brief, user_map
 from app.utils import now_utc, oid, serialize
 
@@ -12,7 +13,8 @@ router = APIRouter(prefix="/payroll", tags=["payroll"])
 
 
 def _net(p: dict) -> float:
-    return round(p["gross"] - p["lop_deduction"] - p.get("other_deductions", 0) + p.get("bonus", 0), 2)
+    return round(p["gross"] - p["lop_deduction"] - p.get("late_deduction", 0)
+                 - p.get("other_deductions", 0) + p.get("bonus", 0), 2)
 
 
 async def _attach(slips: list[dict]) -> list[dict]:
@@ -56,6 +58,9 @@ async def generate(data: PayrollGenerateIn, admin: dict = Depends(require_admin)
             "absent_days": s["absent"], "unpaid_leave_days": s["unpaid_leave"],
             "payable_days": payable_days, "lop_days": lop_days,
             "lop_deduction": round(per_day * lop_days, 2),
+            "late_count": s["late"], "late_minutes": s["late_minutes"],
+            "late_fine_per_5_min": fine_per_block(gross) if gross else 0,
+            "late_deduction": round(late_deduction(gross, s["late_blocks"]), 2),
             "bonus": (existing or {}).get("bonus", 0),
             "other_deductions": (existing or {}).get("other_deductions", 0),
             "remarks": (existing or {}).get("remarks"),

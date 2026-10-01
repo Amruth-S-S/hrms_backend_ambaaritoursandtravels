@@ -4,6 +4,7 @@ from datetime import date
 from bson import ObjectId
 
 from app.core.database import get_db
+from app.services.late_fine import late_blocks
 from app.utils import daterange, local_today, month_bounds
 
 
@@ -54,7 +55,7 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
     leaves = await approved_leave_map(user_id, start, end, company)
 
     s = {"month": month, "working_days": 0, "present": 0, "half_day": 0, "absent": 0,
-         "late": 0, "paid_leave": 0.0, "unpaid_leave": 0.0, "holidays": len(holidays),
+         "late": 0, "late_minutes": 0, "late_blocks": 0, "paid_leave": 0.0, "unpaid_leave": 0.0, "holidays": len(holidays),
          "work_minutes": 0, "overtime_minutes": 0}
 
     for d in daterange(start, end):
@@ -65,6 +66,8 @@ async def month_summary(user: dict, month: str, company: dict) -> dict:
             s["overtime_minutes"] += rec.get("overtime_minutes", 0) or 0
             if rec.get("is_late"):
                 s["late"] += 1
+                s["late_minutes"] += rec.get("late_minutes", 0) or 0
+                s["late_blocks"] += late_blocks(rec.get("late_minutes", 0))
         if not is_working_day(d, company, holidays) or (joined and ds < joined):
             continue
         s["working_days"] += 1
